@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+}
+
+enum RoleName {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum ConnectionType {
+  POSTGRES
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Tenant {
+  id          String      @id @default(cuid())
+  name        String
+  status      String      @default("ACTIVE")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  users       User[]
+  roles       Role[]
+  permissions RolePermission[]
+  allowTables RoleTableAllowlist[]
+  allowCols   RoleColumnAllowlist[]
+  connections DbConnection[]
+  conversations Conversation[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id           String      @id @default(cuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  roleId       String
+  role         Role        @relation(fields: [roleId], references: [id])
+  email        String
+  passwordHash String
+  status       UserStatus  @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  conversations Conversation[]
+  auditLogs    AuditLog[]
+
+  @@unique([tenantId, email])
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      RoleName
+  users     User[]
+
+  @@unique([tenantId, name])
+}
+
+model RolePermission {
+  id         String  @id @default(cuid())
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id])
+  roleId     String
+  role       Role    @relation(fields: [roleId], references: [id])
+  canWrite   Boolean @default(false)
+  maxRows    Int     @default(100)
+  timeoutMs  Int     @default(3000)
+
+  @@unique([tenantId, roleId])
+}
+
+model RoleTableAllowlist {
+  id         String @id @default(cuid())
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  roleId     String
+  role       Role   @relation(fields: [roleId], references: [id])
+  tableName  String
+
+  @@unique([tenantId, roleId, tableName])
+}
+
+model RoleColumnAllowlist {
+  id         String @id @default(cuid())
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  roleId     String
+  role       Role   @relation(fields: [roleId], references: [id])
+  tableName  String
+  columnName String
+
+  @@unique([tenantId, roleId, tableName, columnName])
+}
+
+model DbConnection {
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id])
+  name              String
+  type              ConnectionType
+  host              String
+  port              Int
+  database          String
+  username          String
+  encryptedPassword String
+  sslmode           String
+  status            ConnectionStatus @default(ACTIVE)
+  schemaSnapshot    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  conversations     Conversation[]
+  auditLogs         AuditLog[]
+}
+
+model Conversation {
+  id           String @id @default(cuid())
+  tenantId     String
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+  userId       String
+  user         User   @relation(fields: [userId], references: [id])
+  connectionId String
+  connection   DbConnection @relation(fields: [connectionId], references: [id])
+  title        String
+  createdAt    DateTime @default(now())
+  messages     Message[]
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  role           MessageRole
+  content        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id          String @id @default(cuid())
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id])
+  userId      String
+  user        User @relation(fields: [userId], references: [id])
+  connectionId String?
+  connection   DbConnection? @relation(fields: [connectionId], references: [id])
+  action      String
+  sqlGenerated String?
+  sqlExecuted String?
+  status      String
+  latencyMs   Int?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+}
