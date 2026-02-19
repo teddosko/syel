@@ -1,0 +1,16 @@
+{
+  "name": "db-chat-guard",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @app/backend && npm run build -w @app/frontend",
+    "dev": "concurrently \"npm run dev -w @app/backend\" \"npm run dev -w @app/frontend\"",
+    "test": "npm run test -w @pkg/shared"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
